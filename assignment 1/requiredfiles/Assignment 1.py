@@ -193,5 +193,6 @@ with open('correlations.npy','rb') as f:
 
 ifTest  = False
 Train()
+# Q = np.load("./Q.npy")
 ifTest = True
 mainRun()
