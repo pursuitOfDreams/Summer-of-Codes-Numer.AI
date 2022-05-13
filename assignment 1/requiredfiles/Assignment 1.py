@@ -11,7 +11,7 @@ Zte = {}
 # total number of States and Actions
 n_states =100
 n_actions = 3
-np.random.seed(0)
+#np.random.seed(0)
 
 
 # initial Q-table
