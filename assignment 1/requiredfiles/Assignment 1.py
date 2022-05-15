@@ -2,37 +2,12 @@ import numpy as np
 import pickle
 import random
 import pandas as pd
+from tqdm import tqdm
+
 corr = None
 ifTest = False
 Ztr = {}
 Zte = {}
-
-
-# total number of States and Actions
-n_states =100
-n_actions = 3
-np.random.seed(0)
-
-
-# initial Q-table
-Q = np.zeros([n_states, n_actions])
-epsilons = []
-
-# learning rate
-alpha = 0.99
-
-# discount factor
-gamma = 1.0
-
-# e-greedy exploitation
-epsilon = 0.9
-epsilon_decay = 0.01
-epsilon_final = 0.001
-
-
-# training parameters
-n_episodes = 200
-n_steps = 100
 
 
 def returnNext(state, action):
@@ -75,15 +50,39 @@ def returnNext(state, action):
     cb = ch % 10
     return (pricc,(ca,cb))
 
+
+# total number of States and Actions
+n_states =100
+n_actions = 3
+# np.random.seed(0)
+# initial Q-table
+Q = np.zeros([n_states, n_actions])
+epsilons = []
+cum_rewards=[]
+
+# learning rate
+alpha = 0.1
+
+# discount factor
+gamma = 0.99
+# e-greedy exploitation
+epsilon = 0.9
+epsilon_decay = 0.01
+epsilon_final = 0.001
+
+# training parameters
+n_episodes = 2000
+n_steps = 100
+
 def getState(state, epsilon):
+    """this function returns state based on the value of random number generated"""
     global Q
-    p = np.random.rand()
+    p = np.random.uniform(0,1)
     
     action =None
     if p>epsilon:
-        rand_values = Q[state]+ np.random.rand(1,n_actions)/1000
+        rand_values = Q[state]
         action = np.argmax(rand_values)-1
-
     else:
         action = np.random.randint(n_actions)-1
         
@@ -100,50 +99,63 @@ def Train():
     
     global n_episodes, n_steps, epsilon, epsilon_decay, epsilon_final, gamma, alpha, epsilons, Q
     
-    for i in range(n_episodes):
-        state =0
+    for i in tqdm(range(n_episodes)):
+        # randomly generaating states between 0 and 100
+        state = random.randint(0,99)
+        # initial cumulative reward set
         cum_reward =0
-        done =False
-        
-        inventory = []
+        # initial price of bond
+        inventory=[]
         price =100
+        balance = 0
+        bondbal = 0
+        networth = 0
         
         for j in range(n_steps):
+            # performing n_steps within each iteration
             p = np.random.rand()
             
             action = None
             if p>epsilon:
-                rand_values = Q[state]+ np.random.rand(1,n_actions)/1000
+                rand_values = Q[state]
                 action = np.argmax(rand_values)-1
-            
             else:
                 action = np.random.randint(n_actions)-1
-            
-            
-            
-            if epsilon > epsilon_final:
-                epsilon*=(1-epsilon_decay)
             
             picc, nxt_state = returnNext((state//10,state%10), action)
             
             new_state =nxt_state[0]*10+nxt_state[1]
-                                         
+            
+            old_networth = networth
+            
             reward =0
             price+=picc
             if action==1:
                 inventory.append(price)
+                balance-=10*price
+                bondbal+=10
             elif action ==-1 and len(inventory)>0:
-                bought_price, index = getMinIndex_Value(inventory)
-                del inventory[index]
-                reward = max(price-bought_price,0)
+                balance+=10*price
+                bondbal-=10
             
-            Q[state][action] = ((1-alpha)*Q[state][action]) + alpha*(reward + gamma*np.max(Q[new_state]))
+            networth = balance + bondbal*price
+            delta = networth - old_networth
+            reward =delta
+#             reward = max(delta,0)
+            
+            Q[state][action+1] = ((1-alpha)*Q[state][action+1]) + alpha*(reward + gamma*np.max(Q[new_state]))
             
             cum_reward+=reward
             state = new_state
-            
-            
-#             print(state, action, price, reward, inventory)
+        
+        
+        if epsilon > epsilon_final:
+                epsilon*=(1-epsilon_decay)
+                epsilons.append(epsilon)
+        cum_rewards.append(cum_reward)
+        
+# This you need to write after training your MDP, this should just take in the state and return the Action you would perform
+# Please do not make use of the returnNext function inside here, that would defeat the purpose of training the model, as it would be known to you!
 
 def Run(state):
     global epsilon
@@ -174,6 +186,8 @@ def mainRun(iter = 1000):
         
         networth = balance + bondbal*price
         st = ns
+        # if i%(iter//10)==0:
+        #     print('Your Networth has went from 0 to ',networth)
         print('Your Networth has went from 0 to ',networth)
         i+=1
 
@@ -181,6 +195,8 @@ def mainRun(iter = 1000):
 ftr = input('Train : Filename to read?')
 fte = input('Test : Filename to read from?')
 
+# ftr="./train.pic"
+# fte="./test.pic"
 
 with open(ftr,'rb') as f:
     Ztr = pickle.load(f)
@@ -193,5 +209,6 @@ with open('correlations.npy','rb') as f:
 
 ifTest  = False
 Train()
+# Q =np.load('./Q.npy')
 ifTest = True
-mainRun()
+mainRun(100000)
